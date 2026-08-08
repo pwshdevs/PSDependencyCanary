@@ -62,13 +62,23 @@ jobs:
               throw 'The unchanged project and dependency candidate were not both validated.'
           }
 
-          git diff --check
-          if ($LASTEXITCODE -ne 0) { throw 'The candidate contains whitespace errors.' }
-
           $branch = 'chore/dependency-canary'
           git fetch origin "refs/heads/$branch`:refs/remotes/origin/$branch" 2>$null
           git checkout -B $branch
           git add --update
+          $whitespaceWarnings = @(git diff --cached --check 2>&1)
+          if ($LASTEXITCODE -ne 0) {
+              Write-Warning "The validated candidate contains whitespace warnings:`n$($whitespaceWarnings -join "`n")"
+              @(
+                  '### Dependency candidate whitespace warnings'
+                  ''
+                  'The candidate was committed because whitespace findings are informational.'
+                  ''
+                  '```text'
+                  $whitespaceWarnings
+                  '```'
+              ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+          }
           git commit -m 'chore(deps): validate dependency updates'
           if ($LASTEXITCODE -ne 0) { throw 'Unable to commit the dependency candidate.' }
           git push --force-with-lease --set-upstream origin "HEAD:refs/heads/$branch"

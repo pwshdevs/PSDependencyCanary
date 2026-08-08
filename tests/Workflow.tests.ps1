@@ -12,6 +12,9 @@ Describe 'GitHub Canary workflow <_.FullName>' -ForEach $workflowFiles {
         $installIndex = $workflowContent.IndexOf('Install-Module -Name PSDependencyCanary')
         $cleanIndex = $workflowContent.IndexOf('Clear-PSDependencyCanaryEnvironment')
         $bootstrapIndex = $workflowContent.IndexOf('./build.ps1 -Task Init -Bootstrap')
+        $stageIndex = $workflowContent.IndexOf('git add --update')
+        $whitespaceIndex = $workflowContent.IndexOf('git diff --cached --check')
+        $commitIndex = $workflowContent.IndexOf('git commit')
     }
 
     It 'installs PSDependencyCanary 1.1 or newer before cleaning' {
@@ -31,5 +34,13 @@ Describe 'GitHub Canary workflow <_.FullName>' -ForEach $workflowFiles {
 
     It 'does not depend on a copied cleanup helper' {
         $workflowContent | Should -Not -Match 'Remove-BuildDependencies\.ps1'
+    }
+
+    It 'checks the staged candidate without blocking its commit on whitespace warnings' {
+        $stageIndex | Should -BeGreaterThan -1
+        $whitespaceIndex | Should -BeGreaterThan $stageIndex
+        $commitIndex | Should -BeGreaterThan $whitespaceIndex
+        $workflowContent | Should -Match 'Write-Warning.*whitespace warnings'
+        $workflowContent | Should -Not -Match 'throw.*whitespace'
     }
 }

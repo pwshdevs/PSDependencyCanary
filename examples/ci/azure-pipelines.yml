@@ -42,9 +42,12 @@ steps:
           throw 'The unchanged project and dependency candidate were not both validated.'
       }
       if ($result.Changed) {
-          git diff --check
-          if ($LASTEXITCODE -ne 0) { throw 'The candidate contains whitespace errors.' }
-          git diff --binary --output="$(Build.ArtifactStagingDirectory)/dependency-canary.patch"
+          git add --update
+          $whitespaceWarnings = @(git diff --cached --check 2>&1)
+          if ($LASTEXITCODE -ne 0) {
+              Write-Warning "The validated candidate contains whitespace warnings:`n$($whitespaceWarnings -join "`n")"
+          }
+          git diff --cached --binary --output="$(Build.ArtifactStagingDirectory)/dependency-canary.patch"
           Copy-Item out/dependency-canary.json "$(Build.ArtifactStagingDirectory)/dependency-canary.json"
           Write-Host '##vso[task.setvariable variable=CanaryChanged]true'
       }
