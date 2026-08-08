@@ -23,9 +23,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Remove preinstalled build dependencies
+      - name: Install Canary and clean the module environment
         shell: pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "& '{0}'"
-        run: ./tools/Remove-BuildDependencies.ps1
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $minimumCanaryVersion = '1.1.0'
+          Get-PackageProvider -Name NuGet -ForceBootstrap | Out-Null
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name PSDependencyCanary -MinimumVersion $minimumCanaryVersion -Repository PSGallery -Scope CurrentUser -Force
+          $canaryModule = Import-Module -Name PSDependencyCanary -MinimumVersion $minimumCanaryVersion -Force -PassThru
+          PSDependencyCanary\Clear-PSDependencyCanaryEnvironment -ProjectRoot . -Confirm:$false | Out-Host
+          if (Test-Path -LiteralPath $canaryModule.ModuleBase) {
+              throw "The temporary PSDependencyCanary installation was not removed from '$($canaryModule.ModuleBase)'."
+          }
 
       - name: Initialize the current pinned environment
         shell: pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "& '{0}'"
@@ -118,14 +128,32 @@ jobs:
         if: matrix.edition == 'powershell-7'
         shell: pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "& '{0}'"
         run: |
-          ./tools/Remove-BuildDependencies.ps1
+          $ErrorActionPreference = 'Stop'
+          $minimumCanaryVersion = '1.1.0'
+          Get-PackageProvider -Name NuGet -ForceBootstrap | Out-Null
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name PSDependencyCanary -MinimumVersion $minimumCanaryVersion -Repository PSGallery -Scope CurrentUser -Force
+          $canaryModule = Import-Module -Name PSDependencyCanary -MinimumVersion $minimumCanaryVersion -Force -PassThru
+          PSDependencyCanary\Clear-PSDependencyCanaryEnvironment -ProjectRoot . -Confirm:$false | Out-Host
+          if (Test-Path -LiteralPath $canaryModule.ModuleBase) {
+              throw "The temporary PSDependencyCanary installation was not removed from '$($canaryModule.ModuleBase)'."
+          }
           ./tools/Test-DependencyCanary.ps1
 
       - name: Validate with Windows PowerShell 5.1
         if: matrix.edition == 'windows-powershell'
         shell: powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "& '{0}'"
         run: |
-          ./tools/Remove-BuildDependencies.ps1
+          $ErrorActionPreference = 'Stop'
+          $minimumCanaryVersion = '1.1.0'
+          Get-PackageProvider -Name NuGet -ForceBootstrap | Out-Null
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name PSDependencyCanary -MinimumVersion $minimumCanaryVersion -Repository PSGallery -Scope CurrentUser -Force
+          $canaryModule = Import-Module -Name PSDependencyCanary -MinimumVersion $minimumCanaryVersion -Force -PassThru
+          PSDependencyCanary\Clear-PSDependencyCanaryEnvironment -ProjectRoot . -Confirm:$false | Out-Host
+          if (Test-Path -LiteralPath $canaryModule.ModuleBase) {
+              throw "The temporary PSDependencyCanary installation was not removed from '$($canaryModule.ModuleBase)'."
+          }
           ./tools/Test-DependencyCanary.ps1
 
   promote:

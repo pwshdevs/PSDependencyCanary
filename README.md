@@ -50,7 +50,7 @@ Add PSDependencyCanary to the existing `requirements.psd1`:
 @{
     PSDepend = @{ Version = '0.4.1' }
     PowerShellBuild = @{ Version = '0.8.2' }
-    PSDependencyCanary = @{ Version = '1.0.0' }
+    PSDependencyCanary = @{ Version = '1.1.0' }
 
     # Existing build, test, and runtime dependencies belong here too.
     Pester = @{ Version = '6.0.1' }
@@ -63,7 +63,7 @@ Add the shared task to the existing `psakeFile.ps1`:
 
 ```powershell
 Task Test -FromModule PowerShellBuild -MinimumVersion '0.8.2'
-Task Canary -FromModule PSDependencyCanary -MinimumVersion '1.0.0'
+Task Canary -FromModule PSDependencyCanary -MinimumVersion '1.1.0'
 ```
 
 The shared task exposes paths and optional output features through psake properties:
@@ -96,7 +96,14 @@ $properties = @{
 Then schedule these commands in CI:
 
 ```powershell
-# Install the currently committed pins.
+# Run in a dedicated process or CI step. The command removes all installed
+# versions of the project's declared dependencies and this temporary module,
+# while preserving Pester 3.x.
+Install-Module PSDependencyCanary -MinimumVersion 1.1.0 -Scope CurrentUser -Force
+Import-Module PSDependencyCanary -MinimumVersion 1.1.0 -Force
+PSDependencyCanary\Clear-PSDependencyCanaryEnvironment -ProjectRoot . -Confirm:$false
+
+# Run in a fresh process or CI step and install the currently committed pins.
 ./build.ps1 -Task Init -Bootstrap
 
 # Baseline-test, stage updates, rebootstrap, and test the candidate.
@@ -112,7 +119,8 @@ if ($result.Changed -and (-not $result.BaselineTested -or -not $result.Tested -o
 }
 ```
 
-Copyable pipeline examples are available for:
+`Clear-PSDependencyCanaryEnvironment` is intended for disposable CI runners; use
+`-WhatIf` before running it in a persistent development environment. Copyable pipeline examples are available for:
 
 - [GitHub Actions](examples/ci/github-actions.yml), which can be copied to `.github/workflows/canary.yml` and includes automatic pull-request creation
 - [GitLab CI](examples/ci/gitlab-ci.yml), producing a validated patch artifact

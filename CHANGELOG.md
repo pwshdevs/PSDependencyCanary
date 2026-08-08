@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [1.0.0] Unreleased
+## [1.1.0] 2026-08-08
+
+### Added
+
+- `Clear-PSDependencyCanaryEnvironment` for resetting CI runners before the committed dependency bootstrap.
+
+### Changed
+
+- GitHub Canary workflows now temporarily install PSDependencyCanary, clean the project's declared dependencies while preserving Pester 3.x, remove the temporary Canary installation, and then bootstrap the committed pins in a fresh step.
+
+## [1.0.0] 2026-08-08
 
 ### Added
 

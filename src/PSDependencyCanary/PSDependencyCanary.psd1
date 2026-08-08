@@ -1,6 +1,6 @@
 @{
     RootModule = 'PSDependencyCanary.psm1'
-    ModuleVersion = '1.0.0'
+    ModuleVersion = '1.1.0'
     GUID = '6ac2534d-1d38-4e61-8116-67bfbcf79391'
 
     Author = 'PwshDevs'
@@ -12,6 +12,7 @@
     RequiredModules = @()
 
     FunctionsToExport = @(
+        'Clear-PSDependencyCanaryEnvironment'
         'Test-PSDependencyCanary'
         'Update-PSDependencyCanary'
     )
