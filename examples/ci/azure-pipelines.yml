@@ -1,0 +1,43 @@
+trigger: none
+pr: none
+
+schedules:
+  - cron: '17 7 * * 1'
+    displayName: Weekly dependency canary
+    branches:
+      include:
+        - main
+    always: true
+
+pool:
+  vmImage: windows-latest
+
+steps:
+  - checkout: self
+    fetchDepth: 0
+
+  - pwsh: ./build.ps1 -Task Init -Bootstrap
+    displayName: Bootstrap the committed dependency pins
+
+  - pwsh: ./build.ps1 -Task Canary
+    displayName: Baseline-test and validate dependency updates
+
+  - pwsh: |
+      $ErrorActionPreference = 'Stop'
+      $result = Get-Content -Raw out/dependency-canary.json | ConvertFrom-Json
+      if ($result.Changed -and (-not $result.BaselineTested -or -not $result.Tested -or -not $result.Applied)) {
+          throw 'The unchanged project and dependency candidate were not both validated.'
+      }
+      if ($result.Changed) {
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { throw 'The candidate contains whitespace errors.' }
+          git diff --binary --output="$(Build.ArtifactStagingDirectory)/dependency-canary.patch"
+          Copy-Item out/dependency-canary.json "$(Build.ArtifactStagingDirectory)/dependency-canary.json"
+          Write-Host '##vso[task.setvariable variable=CanaryChanged]true'
+      }
+    displayName: Prepare the validated candidate
+
+  - publish: $(Build.ArtifactStagingDirectory)
+    artifact: dependency-canary
+    displayName: Publish the validated candidate
+    condition: and(succeeded(), eq(variables['CanaryChanged'], 'true'))

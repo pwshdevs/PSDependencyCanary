@@ -1,0 +1,26 @@
+dependency-canary:
+  stage: test
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+  script:
+    - pwsh -NoLogo -NoProfile -File ./build.ps1 -Task Init -Bootstrap
+    - pwsh -NoLogo -NoProfile -File ./build.ps1 -Task Canary
+    - >
+      pwsh -NoLogo -NoProfile -Command '
+        $result = Get-Content -Raw out/dependency-canary.json | ConvertFrom-Json;
+        if ($result.Changed -and (-not $result.BaselineTested -or -not $result.Tested -or -not $result.Applied)) {
+            throw "The unchanged project and dependency candidate were not both validated."
+        }
+        if ($result.Changed) {
+            git diff --check;
+            if ($LASTEXITCODE -ne 0) { throw "The candidate contains whitespace errors." }
+            git diff --binary --output=out/dependency-canary.patch;
+        }
+      '
+  artifacts:
+    when: on_success
+    expire_in: 7 days
+    paths:
+      - out/dependency-canary.json
+      - out/dependency-canary.patch

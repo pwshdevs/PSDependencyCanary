@@ -1,0 +1,89 @@
+name: Dependency canary
+
+on:
+  schedule:
+    - cron: '17 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependency-canary
+  cancel-in-progress: true
+
+jobs:
+  canary:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Bootstrap the committed dependency pins
+        shell: pwsh
+        run: ./build.ps1 -Task Init -Bootstrap
+
+      - name: Baseline-test and validate dependency updates
+        shell: pwsh
+        env:
+          PSDEPENDENCYCANARY_RESULT_PATH: ${{ runner.temp }}/dependency-canary.json
+        run: ./build.ps1 -Task Canary
+
+      - name: Create or update the dependency pull request
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT_PATH: ${{ runner.temp }}/dependency-canary.json
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $result = Get-Content -Raw -LiteralPath $env:RESULT_PATH | ConvertFrom-Json
+          if (-not $result.Changed) {
+              'All dependency pins are current.' >> $env:GITHUB_STEP_SUMMARY
+              exit 0
+          }
+          if (-not $result.BaselineTested -or -not $result.Tested -or -not $result.Applied) {
+              throw 'The unchanged project and dependency candidate were not both validated.'
+          }
+
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { throw 'The candidate contains whitespace errors.' }
+
+          $branch = 'chore/dependency-canary'
+          git fetch origin "refs/heads/$branch`:refs/remotes/origin/$branch" 2>$null
+          git checkout -B $branch
+          git add --update
+          git commit -m 'chore(deps): validate dependency updates'
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to commit the dependency candidate.' }
+          git push --force-with-lease --set-upstream origin "HEAD:refs/heads/$branch"
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to push the dependency candidate.' }
+
+          $updates = @(
+              $result.Updates |
+                  Sort-Object Type, Name |
+                  ForEach-Object {
+                      "| $($_.Type) | $($_.Name) | $($_.CurrentVersion) | $($_.CandidateVersion) |"
+                  }
+          )
+          $bodyPath = Join-Path $env:RUNNER_TEMP 'dependency-canary-pr.md'
+          @"
+          The unchanged project passed its complete test task. The updated dependency
+          environment was then bootstrapped and passed the same task.
+
+          | Declaration | Dependency | Previous | Validated |
+          | --- | --- | --- | --- |
+          $($updates -join "`n")
+          "@ | Set-Content -LiteralPath $bodyPath -Encoding utf8
+
+          $pullRequest = gh pr list --head $branch --state open --json number --jq '.[0].number'
+          if ($pullRequest) {
+              gh pr edit $pullRequest --title 'chore(deps): validated dependency updates' --body-file $bodyPath
+          } else {
+              gh pr create `
+                  --base '${{ github.event.repository.default_branch }}' `
+                  --head $branch `
+                  --title 'chore(deps): validated dependency updates' `
+                  --body-file $bodyPath
+          }
