@@ -108,7 +108,8 @@ Describe 'Clear-PSDependencyCanaryEnvironment' {
     }
 
     It 'can remove the installed files of the module executing the command' {
-        $installedModuleRoot = Join-Path $moduleRoot 'PSDependencyCanary/1.1.0'
+        $builtManifest = Import-PowerShellDataFile -LiteralPath (Join-Path $env:BHBuildOutput 'PSDependencyCanary.psd1')
+        $installedModuleRoot = Join-Path $moduleRoot "PSDependencyCanary/$($builtManifest.ModuleVersion)"
         [void](New-Item -ItemType Directory -Path $installedModuleRoot -Force)
         Copy-Item -Path (Join-Path $env:BHBuildOutput '*') -Destination $installedModuleRoot -Recurse -Force
         $installedManifest = Join-Path $installedModuleRoot 'PSDependencyCanary.psd1'

@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.1.1] 2026-10-14
+
+### Changed
+
+- Update build dependencies to PSDepend 0.6.0 and Pester 6.2.0 and refresh generated command documentation.
+- Publish the accumulated workflow maintenance changes under a new patch version.
+
+### Fixed
+
+- Derive the self-cleanup test's installation folder from the built module version so patch releases can pass validation.
+
 ## [1.1.0] 2026-08-08
 
 ### Added
